@@ -18,20 +18,25 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 
 # ==========================================
-# FIREBASE INITIALIZATION (SAFE SECRETS / FILE PATH)
+# FIREBASE INITIALIZATION (AUTO SANITIZED)
 # ==========================================
 db = None
 
 if not firebase_admin._apps:
     try:
-        # 1. First check if Firebase credentials exist in Streamlit Secrets (for Cloud Deployment)
+        # 1. Check Streamlit Secrets (Cloud Deployment)
         if "FIREBASE_CREDENTIALS" in st.secrets:
             cred_dict = dict(st.secrets["FIREBASE_CREDENTIALS"])
+            
+            # Auto-fix PEM formatting issue for Streamlit Cloud
+            if "private_key" in cred_dict:
+                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+                
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred)
             db = firestore.client()
         else:
-            # 2. Fallback to local json file (for Local Development)
+            # 2. Local Fallback (Local Development)
             BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
             if not os.path.exists(KEY_PATH):
@@ -42,7 +47,7 @@ if not firebase_admin._apps:
                 firebase_admin.initialize_app(cred)
                 db = firestore.client()
             else:
-                st.warning("⚠️ Firebase credentials not configured in Streamlit Secrets or local file.")
+                st.warning("⚠️ Firebase credentials not found.")
     except Exception as e:
         st.error(f"Error initializing Firebase: {e}")
 else:
