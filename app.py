@@ -18,26 +18,33 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 
 # ==========================================
-# FIREBASE INITIALIZATION (SAFE ABSOLUTE PATH)
+# FIREBASE INITIALIZATION (SAFE SECRETS / FILE PATH)
 # ==========================================
 db = None
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
-
-if not os.path.exists(KEY_PATH):
-    KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json.json")
-
 if not firebase_admin._apps:
-    if os.path.exists(KEY_PATH):
-        try:
-            cred = credentials.Certificate(KEY_PATH)
+    try:
+        # 1. First check if Firebase credentials exist in Streamlit Secrets (for Cloud Deployment)
+        if "FIREBASE_CREDENTIALS" in st.secrets:
+            cred_dict = dict(st.secrets["FIREBASE_CREDENTIALS"])
+            cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred)
             db = firestore.client()
-        except Exception as e:
-            st.error(f"Error initializing Firebase: {e}")
-    else:
-        st.warning("⚠️ `firebase_key.json` file not found! Please place it in the project directory.")
+        else:
+            # 2. Fallback to local json file (for Local Development)
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
+            if not os.path.exists(KEY_PATH):
+                KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json.json")
+
+            if os.path.exists(KEY_PATH):
+                cred = credentials.Certificate(KEY_PATH)
+                firebase_admin.initialize_app(cred)
+                db = firestore.client()
+            else:
+                st.warning("⚠️ Firebase credentials not configured in Streamlit Secrets or local file.")
+    except Exception as e:
+        st.error(f"Error initializing Firebase: {e}")
 else:
     db = firestore.client()
 
